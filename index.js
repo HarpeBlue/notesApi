@@ -1,10 +1,12 @@
+require("dotenv").config();
+require("./mongo");
+
 const express = require("express");
 const cors = require("cors");
-const mongoose = require("mongoose");
-require("./mongo");
 const Note = require("./models/Note");
+const { response } = require("express");
 
-const logger = (req, res, next) => {
+const logger = async (req, res, next) => {
   console.log(`${req.method} ${req.path}`);
   next();
 };
@@ -24,18 +26,23 @@ app.get("/api/notes", (req, res) => {
   Note.find({})
     .then((notes) => {
       res.json(notes);
-      mongoose.connection.close();
     })
     .catch((err) => {
       console.error(err);
     });
 });
 
-app.get("/api/notes/:id", (req, res) => {
-  const id = parseInt(req.params.id);
-  const note = notes.find((note) => note.id === id);
-
-  note ? res.json(note) : res.status(404).end();
+app.get("/api/notes/:id", (req, res, next) => {
+  const { id } = req.params;
+  Note.findById(id)
+    .then((note) => {
+      note
+        ? res.json(note)
+        : res.status(404).json({ message: "Not found" }).end();
+    })
+    .catch((err) => {
+      next(err);
+    });
 });
 
 app.delete("/api/notes/:id", (req, res) => {
@@ -46,22 +53,37 @@ app.delete("/api/notes/:id", (req, res) => {
 
 app.post("/api/notes", (req, res) => {
   const note = req.body;
-  const ids = notes.map((note) => note.id);
-  const maxId = Math.max(...ids);
-  const newNote = {
-    id: maxId + 1,
+
+  const newNote = new Note({
     content: note.content,
     date: new Date().toISOString(),
-  };
-  notes = [...notes, newNote];
-  res.status(201).json(newNote);
+    important: note.important || false,
+  });
+
+  newNote
+    .save()
+    .then((savedNote) => {
+      res.status(201).json(savedNote);
+    })
+    .catch((err) => {
+      console.error(err);
+    });
+});
+
+app.use((err, req, res) => {
+  console.error(err);
+  if (err.name === "CastError") {
+    res.status(400).end();
+  } else {
+    response.status(500).end();
+  }
 });
 
 app.use((req, res) => {
   res.status(404).json({ error: "Not found route" });
 });
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT;
 app.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
 });
