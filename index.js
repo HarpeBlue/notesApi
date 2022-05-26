@@ -1,5 +1,8 @@
 const express = require("express");
 const cors = require("cors");
+const mongoose = require("mongoose");
+require("./mongo");
+const Note = require("./models/Note");
 
 const logger = (req, res, next) => {
   console.log(`${req.method} ${req.path}`);
@@ -11,30 +14,21 @@ app.use(cors());
 app.use(express.json());
 app.use(logger);
 
-let notes = [
-  {
-    id: 1,
-    title: "First note",
-    body: "This is my first note",
-  },
-  {
-    id: 2,
-    title: "Second note",
-    body: "This is my second note",
-  },
-  {
-    id: 3,
-    title: "Third note",
-    body: "This is my third note",
-  },
-];
+let notes = [];
 
 app.get("/", (req, res) => {
   res.send("Hello World!");
 });
 
 app.get("/api/notes", (req, res) => {
-  res.json(notes);
+  Note.find({})
+    .then((notes) => {
+      res.json(notes);
+      mongoose.connection.close();
+    })
+    .catch((err) => {
+      console.error(err);
+    });
 });
 
 app.get("/api/notes/:id", (req, res) => {
